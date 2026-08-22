@@ -9,7 +9,7 @@ A pipeline design and working prototype for a trading platform data warehouse: r
 | [part1_pipeline.md](part1_pipeline.md) | Pipeline design: architecture, idempotency, late/missing data, delete handling, edge cases |
 | [part2_data_model.md](part2_data_model.md) | Dimensional model (star schema), SCD2 historization design |
 | [part3_architecture.md](part3_architecture.md) | TL extension: real-time + batch architecture, build vs. buy — **not yet written** |
-| [prompts.md](prompts.md) | AI prompts used per part — **not yet written**, needs to become `PROMPTS.md` per the submission spec |
+| [PROMPTS.md](PROMPTS.md) | AI prompts used per part, grouped by part |
 | `data/` | The provided source files (JSON, CSV, JSONL) |
 | `code/dags/` | Airflow DAG orchestrating the pipeline |
 | `code/dbt/` | dbt project: staging models, marts, tests, seeds |
@@ -158,5 +158,5 @@ cd code/dbt
 
 - `sql/` is empty — Part 2a references `sql/schema.sql`, which hasn't been written yet.
 - `part3_architecture.md` is a scaffold only — the real-time/batch architecture and build-vs-buy sections haven't been designed.
-- `prompts.md` is empty and needs both content and a rename to `PROMPTS.md` per the submission spec.
+- Part 1's edge case table lists 7 cases; the brief caps this at 2–5 — worth trimming to the 5 strongest before submission.
 - The reconciliation script's `matched`/`mismatch` branch (comparing `fee_usd`, `payment_method`, etc. when a business-key match *does* exist) is implemented but untested by this dataset — none of the sample vendor rows happen to overlap with an existing warehouse deposit, so that code path has never actually run against real matching data.
