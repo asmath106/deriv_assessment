@@ -1,0 +1,47 @@
+name: 'deriv_assessment'
+version: '1.0.0'
+config-version: 2
+
+profile: 'deriv_assessment'
+
+model-paths: ["models"]
+seed-paths: ["seeds"]
+test-paths: ["tests"]
+macro-paths: ["macros"]
+
+target-path: "target"
+clean-targets:
+  - "target"
+  - "dbt_packages"
+
+models:
+  deriv_assessment:
+    staging:
+      +materialized: view
+      +schema: staging
+    marts:
+      +materialized: table
+      +schema: marts
+
+seeds:
+  deriv_assessment:
+    client_profile_history:
+      # explicit typing -- CSV type inference alone shouldn't be trusted for
+      # the boolean (is_current/is_deleted) and timestamp columns this seed
+      # is built on, since dim_clients.sql's SCD2 logic depends on them.
+      +column_types:
+        client_id: varchar
+        full_name: varchar
+        date_of_birth: date
+        nationality: varchar
+        risk_category: varchar
+        account_balance_usd: decimal(18,2)
+        account_status: varchar
+        currency: varchar
+        preferred_language: varchar
+        last_login_date: date
+        effective_from: timestamp
+        effective_to: timestamp
+        is_current: boolean
+        is_deleted: boolean
+        source_lsn: bigint

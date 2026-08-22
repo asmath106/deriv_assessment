@@ -1,0 +1,57 @@
+version: 2
+
+sources:
+  - name: raw
+    description: >
+      Raw landing tables. Assumes a landing step (outside this dbt project --
+      see code/dags) loads each of CLIENT_SIGNUP.JSON, CLIENT_PROFILE.JSON,
+      CLIENT_DEPOSIT.JSON, CLIENT_TRADES.JSON, and each daily
+      DEPOSITS_VENDOR_*.CSV into its own raw table, tagged with an
+      _ingested_at column.
+    tables:
+      - name: client_signup
+        description: Raw landing table for CLIENT_SIGNUP.JSON.
+
+      - name: client_profile
+        description: Raw landing table for CLIENT_PROFILE.JSON (pre-CDC baseline).
+
+      - name: client_deposit
+        description: >
+          Raw landing table for CLIENT_DEPOSIT.JSON, the existing warehouse
+          deposit table. Contains DEP012 with a malformed `credit_card`
+          column instead of `payment_method` -- handled in stg_clients_deposit.
+
+      - name: client_trades
+        description: Raw landing table for CLIENT_TRADES.JSON.
+
+      # Vendor deposits land as one raw table per daily delivery. In a live
+      # system these would be partitions of a single appending table rather
+      # than three distinct tables -- kept as three here to mirror how the
+      # files were actually provided; freshness is checked per delivery.
+      - name: deposits_vendor_20240301
+        description: Vendor deposit feed, delivered 2024-03-01.
+        loaded_at_field: _ingested_at
+        freshness:
+          warn_after: {count: 24, period: hour}
+          error_after: {count: 48, period: hour}
+
+      - name: deposits_vendor_20240302
+        description: >
+          Vendor deposit feed, delivered 2024-03-02. Column `payment_method`
+          is renamed to `method` in this delivery only -- schema drift
+          handled explicitly in stg_vendor_deposits.
+        loaded_at_field: _ingested_at
+        freshness:
+          warn_after: {count: 24, period: hour}
+          error_after: {count: 48, period: hour}
+
+      - name: deposits_vendor_20240303
+        description: >
+          Vendor deposit feed, delivered 2024-03-03. All deposit_date values
+          in this file predate the delivery date (late-arriving records) --
+          see part1_pipeline.md section 3. Also contains VDEP020, referencing
+          unknown client_id CL099.
+        loaded_at_field: _ingested_at
+        freshness:
+          warn_after: {count: 24, period: hour}
+          error_after: {count: 48, period: hour}

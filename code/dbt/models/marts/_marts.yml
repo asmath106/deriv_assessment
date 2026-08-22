@@ -1,0 +1,25 @@
+version: 2
+
+models:
+  - name: dim_clients
+    description: >
+      Client dimension, SCD Type 2 on risk_category / account_balance_usd /
+      account_status, plus early-arriving-fact placeholder rows for clients
+      referenced by a fact before any dimension record exists for them.
+    columns:
+      - name: client_key
+        tests: [unique, not_null]
+      - name: client_id
+        tests: [not_null]
+      - name: is_current
+        tests: [not_null]
+      - name: is_deleted
+        tests: [not_null]
+
+  - name: fct_trading_performace
+    description: One row per trade, joined to the dim_clients version active as of trade_date.
+    columns:
+      - name: trade_id
+        tests: [unique, not_null]
+      - name: client_id
+        tests: [not_null]

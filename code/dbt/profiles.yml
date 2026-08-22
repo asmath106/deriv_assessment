@@ -1,0 +1,7 @@
+deriv_assessment:
+  target: dev
+  outputs:
+    dev:
+      type: duckdb
+      path: deriv_assessment.duckdb
+      threads: 4

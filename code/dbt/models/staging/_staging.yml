@@ -1,0 +1,178 @@
+version: 2
+
+models:
+  - name: stg_client_signup
+    description: One row per client signup, light typing/cleanup only.
+    config:
+      contract:
+        enforced: true
+    columns:
+      - name: client_id
+        data_type: varchar
+        tests: [unique, not_null]
+      - name: signup_date
+        data_type: date
+      - name: country
+        data_type: varchar
+      - name: email
+        data_type: varchar
+      - name: referral_source
+        data_type: varchar
+      - name: account_type
+        data_type: varchar
+      - name: kyc_status
+        data_type: varchar
+        tests:
+          - accepted_values:
+              arguments:
+                values: ['approved', 'pending', 'rejected']
+      - name: signup_platform
+        data_type: varchar
+      - name: promo_code
+        data_type: varchar
+      - name: assigned_manager
+        data_type: varchar
+
+  - name: stg_client_profile
+    description: Baseline profile snapshot, pre-CDC (version 1 of each client's history).
+    config:
+      contract:
+        enforced: true
+    columns:
+      - name: client_id
+        data_type: varchar
+        tests: [unique, not_null]
+      - name: full_name
+        data_type: varchar
+      - name: date_of_birth
+        data_type: date
+      - name: nationality
+        data_type: varchar
+      - name: risk_category
+        data_type: varchar
+        tests:
+          - accepted_values:
+              arguments:
+                values: ['low', 'medium', 'high']
+      - name: account_balance_usd
+        data_type: decimal(18,2)
+      - name: account_status
+        data_type: varchar
+      - name: currency
+        data_type: varchar
+      - name: last_login_date
+        data_type: date
+      - name: preferred_language
+        data_type: varchar
+      - name: is_dob_suspect
+        data_type: boolean
+        description: >
+          True when date_of_birth predates 1900-01-01. Found in the data:
+          CL025's date_of_birth is 1888-12-19, not a plausible birth year for
+          an active trading client. Flagged (warn), not rejected -- the row
+          still loads. This needs a source-side correction, not a pipeline
+          guess, so the pipeline surfaces it rather than silently fixing it.
+        tests:
+          - accepted_values:
+              arguments:
+                values: [false]
+              config:
+                severity: warn
+
+  - name: stg_vendor_deposits
+    description: Vendor deposit feed, unioned across daily deliveries, deduped on deposit_id.
+    config:
+      contract:
+        enforced: true
+    columns:
+      - name: deposit_id
+        data_type: varchar
+        tests: [unique, not_null]
+      - name: client_id
+        data_type: varchar
+        tests:
+          - not_null
+          # Found in the data: VDEP020 (2024-03-03 delivery) references
+          # CL099, which has no signup/profile row anywhere. This is the
+          # early-arriving-fact case handled by the inferred placeholder
+          # pattern in marts/dim_clients.sql -- warn only, never block the
+          # deposit load on dimension completeness.
+          - relationships:
+              arguments:
+                to: ref('stg_client_signup')
+                field: client_id
+              config:
+                severity: warn
+      - name: deposit_date
+        data_type: date
+      - name: amount_usd
+        data_type: decimal(18,2)
+        tests:
+          # Found in the data: VDEP001 (2024-03-01 delivery) has
+          # amount_usd = -250.00. HIGH severity per part1_pipeline.md's data
+          # quality table ("quarantine + alert") -- left at the default
+          # error severity so this intentionally fails dbt test.
+          - dbt_utils.expression_is_true:
+              arguments:
+                expression: ">= 0"
+      - name: payment_method
+        data_type: varchar
+      - name: currency_original
+        data_type: varchar
+      - name: exchange_rate
+        data_type: decimal(18,6)
+      - name: status
+        data_type: varchar
+      - name: processing_days
+        data_type: integer
+      - name: fee_usd
+        data_type: decimal(18,2)
+      - name: source_file_date
+        data_type: date
+      - name: is_negative_amount
+        data_type: boolean
+
+  - name: stg_clients_deposit
+    description: Existing warehouse deposit table (pre-vendor-feed baseline).
+    config:
+      contract:
+        enforced: true
+    columns:
+      - name: deposit_id
+        data_type: varchar
+        tests: [unique, not_null]
+      - name: client_id
+        data_type: varchar
+        tests:
+          - not_null
+          # Found in the data: DEP020 references CL031, which has no
+          # signup/profile row -- same early-arriving-fact case as CL099
+          # above.
+          - relationships:
+              arguments:
+                to: ref('stg_client_signup')
+                field: client_id
+              config:
+                severity: warn
+      - name: deposit_date
+        data_type: date
+      - name: amount_usd
+        data_type: decimal(18,2)
+      - name: payment_method
+        data_type: varchar
+      - name: currency_original
+        data_type: varchar
+      - name: exchange_rate
+        data_type: decimal(18,6)
+      - name: status
+        data_type: varchar
+      - name: processing_days
+        data_type: integer
+      - name: fee_usd
+        data_type: decimal(18,2)
+      - name: had_malformed_schema
+        data_type: boolean
+        description: >
+          True for DEP012, captured with a `credit_card` key instead of
+          `payment_method` in the raw source JSON. Value recovered via
+          coalesce rather than the row being dropped.
